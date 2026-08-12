@@ -2,13 +2,14 @@
 <html>
 <head>
     <title>Light pollution geojson map</title>
-    <meta charset="utf-8" />
+    <meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet" />
     <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.3/leaflet-maplibre-gl.js"></script>
+    <script src="https://unpkg.com/leaflet.control.opacity@1.6.0/dist/L.Control.Opacity.js"></script>
 
 </head>
 <body>
@@ -24,12 +25,24 @@
     </style>
     <div id="map"></div>
     <script>
-        const map = L.map('map').setView([47.60, -122.34], 9.5)
-
-        L.maplibreGL({
+        // Base maps
+        var ofmLiberty = L.maplibreGL({
             style: 'https://tiles.openfreemap.org/styles/liberty',
-        }).addTo(map)
+        })
+        var ofmFiord = L.maplibreGL({
+            style: 'https://tiles.openfreemap.org/styles/fiord',
+        })
+        var ofmDark = L.maplibreGL({
+            style: 'https://tiles.openfreemap.org/styles/dark',
+        })
 
+        var baseMaps = {
+            "ofm.Liberty": ofmLiberty,
+            "ofm.Fiord": ofmFiord,
+            "ofm.Dark": ofmDark
+        };
+
+        // Overlay maps
         const infoLink = '<a href="https://djlorenz.github.io/astronomy/lp/" target="_blank">Light Pollution Atlas Information</a>';
         const lightpollution2025 = L.tileLayer(
             'https://djlorenz.github.io/astronomy/image_tiles/tiles2025/tile_{z}_{x}_{y}.png', {
@@ -40,9 +53,26 @@
                 zoomOffset: -2,
                 opacity: 0.4,
                 errorTileUrl: 'https://djlorenz.github.io/astronomy/image_tiles/tiles2025/black.png'
-            }).addTo(map)
-        map.attributionControl.addAttribution(infoLink)
+            })
 
+        var overlays = {
+            "Light.2025": lightpollution2025
+        }
+
+        const map = L.map('map', {
+            center: [47.60, -122.34],
+            zoom: 8,
+            layers: [ofmLiberty, lightpollution2025],
+        })
+        map.attributionControl.addAttribution(infoLink)
+        var layerControl = L.control.layers(baseMaps, overlays, {
+            collapsed: false,
+            position: 'topleft',
+        }).addTo(map);
+        var opacityControl = L.control.opacity(overlays, {
+            position: 'bottomleft',
+            collapsed: false
+        }).addTo(map);
         // Grab the geojson, decode it
         const queryString = window.location.search;
         const urlParams = new URLSearchParams(queryString);
@@ -67,17 +97,25 @@
                 return new TextDecoder().decode(arrayBuffer);
             }
 
-            // Add a tooltip
+            // Add a tooltip and click action
             function onEachFeature(feature, layer) {
                 if (feature.properties) {
                     layer.bindTooltip(feature.properties.name + "<br> Sites: " + feature.properties.available);
                 }
+                layer.on({click: function(e){
+                    window.open(e.target.feature.properties.url, "_blank")
+                }})
             }
 
-            decompress(base64).then( geoString => 
-                L.geoJSON(JSON.parse(geoString), {
+            // Add the geoJson layer as an overlay
+            var geoLayer = null;
+            decompress(base64).then( geoString => {
+                geoLayer = L.geoJSON(JSON.parse(geoString), {
                     onEachFeature: onEachFeature
-                }).addTo(map))
+                })
+                layerControl.addOverlay(geoLayer, "Campgrounds")
+                geoLayer.addTo(map)
+            })        
             .catch(err => console.error(err))
         }
     </script>
