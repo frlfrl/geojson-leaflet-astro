@@ -55,8 +55,8 @@
                 opacity: 0.4,
                 errorTileUrl: 'https://djlorenz.github.io/astronomy/image_tiles/tiles2025/black.png'
             })
-        const noaaFillOpacity = 0.3;
-        const noaa = L.esri.featureLayer({
+
+        const noaaSmoke = L.esri.featureLayer({
             url: "https://services2.arcgis.com/C8EMgrsFcRFL6LrL/arcgis/rest/services/NOAA_Satellite_Smoke_Detection_(v1)/FeatureServer/0", 
             // Order the smoke layers so density isn't obscured
             onEachFeature: function(feature, layer) {
@@ -73,9 +73,9 @@
             },
             style: (feature) => {
                 let style = {
-                    color: '#626b73', // no outline color
+                    color: '#626b73',
                     opacity: 0.2,
-                    fillOpacity: noaaFillOpacity,
+                    fillOpacity: smokeFillOpacity,
                 };
                 if (feature.properties.Density === "Light") {
                     style.fillColor = "#6fee64";
@@ -89,17 +89,69 @@
             }
         })
 
-        // Hacky way to let the opacity plugin work here
-        noaa.options.opacity = noaaFillOpacity;
-        noaa._url = 'feature';
-        noaa.setOpacity = function (opacity) {
+        const noaaFire = L.esri.featureLayer({
+            url: "https://services2.arcgis.com/C8EMgrsFcRFL6LrL/arcgis/rest/services/NOAA_Satellite_Fire_Detections_(v1)/FeatureServer/0",
+              pointToLayer: function (geojson, latlng) {
+                return L.circleMarker(latlng, {
+                    radius: 6,
+                    fillColor: "#feb14c",
+                    color: "#000",
+                    weight: 1,
+                });
+            },
+            onEachFeature: function(feature, layer) {
+                if (feature.properties.FRP < 50) {
+                    // setTimeout ensures the layer is fully rendered before moving it
+                    setTimeout(function() {
+                        layer.bringToBack(); 
+                    }, 0);
+                } else if (feature.properties.FRP > 150) {
+                    setTimeout(function() {
+                        layer.bringToFront(); 
+                    }, 0);
+                }
+            },
+            style: (feature) => {
+                let style = {
+                    opacity: fireFillOpacity,
+                    fillOpacity: fireFillOpacity,
+                };
+                if (feature.properties.FRP < 50) {
+                    style.fillColor = "#feb14c";
+                } else if (feature.properties.FRP < 150) {
+                    style.fillColor = "#fc5029";
+                } else if (feature.properties.FRP < 350) {
+                    style.fillColor = "#e3191c";
+                } else {
+                    style.fillColor = "#b30024";
+                }
+
+                return style;
+            }
+        })
+
+        // Hacky way to let the opacity plugin work on esri featureLayers
+        const smokeFillOpacity = 0.3;
+        const fireFillOpacity = 0.5
+        noaaSmoke._url = 'feature';
+        noaaFire._url = 'feature';
+        noaaSmoke.setOpacity = function (opacity) {
             this.setStyle({
-                fillOpacity: opacity
+                fillOpacity: opacity,
+                opacity: opacity
             });
         };
+        noaaFire.setOpacity = function (opacity) {
+            this.setStyle({
+                fillOpacity: opacity,
+                opacity: opacity
+            });
+        };
+
         var overlays = {
             "Light.2025": lightpollution2025,
-            "Smoke": noaa
+            "Smoke": noaaSmoke,
+            "Fires": noaaFire
         }
 
         const map = L.map('map', {
@@ -108,14 +160,19 @@
             layers: [ofmLiberty, lightpollution2025],
         })
         map.attributionControl.addAttribution(infoLink)
+
+        // Layer toggles
         var layerControl = L.control.layers(baseMaps, overlays, {
             collapsed: false,
             position: 'topleft',
         }).addTo(map);
+
+        // Opacity sliders
         var opacityControl = L.control.opacity(overlays, {
             position: 'bottomleft',
             collapsed: false
         }).addTo(map);
+
         // Grab the geojson, decode it
         const queryString = window.location.search;
         const urlParams = new URLSearchParams(queryString);
