@@ -26,6 +26,10 @@
     </style>
     <div id="map"></div>
     <script>
+        //TODO:
+        // - AQI: https://www.arcgis.com/home/item.html?id=ae6bb649e4dd4b18bac4e5b0c3ba2e8a#overview
+        // - Moar: https://www.weather.gov/gis/cloudgiswebservices
+        // - cloud cover? 
         // Base maps
         var ofmLiberty = L.maplibreGL({
             style: 'https://tiles.openfreemap.org/styles/liberty',
@@ -130,6 +134,19 @@
             }
         })
 
+        const weather = L.tileLayer.wms('https://opengeo.ncep.noaa.gov/geoserver/conus/conus_cref_qcd/ows?SERVICE=WMS&', {
+                    layers: 'conus_cref_qcd',
+                    transparent: true,
+                    opacity: 0.6,
+                    format: 'image/png' // needed for transparency
+                })
+        const clouds = L.tileLayer.wms('https://mapservices.weather.noaa.gov/geoserver/ndfd/sky/ows?SERVICE=WMS&', {
+                    layers: 'sky',
+                    transparent: true,
+                    opacity: 0.6,
+                    format: 'image/png'
+                })
+
         // Hacky way to let the opacity plugin work on esri featureLayers
         const smokeFillOpacity = 0.3;
         const fireFillOpacity = 0.5
@@ -151,7 +168,9 @@
         var overlays = {
             "Light.2025": lightpollution2025,
             "Smoke": noaaSmoke,
-            "Fires": noaaFire
+            "Fires": noaaFire,
+            "Weather": weather,
+            "Clouds": clouds
         }
 
         const map = L.map('map', {
@@ -218,5 +237,6 @@
             })        
             .catch(err => console.error(err))
         }
+
     </script>
 </body>
