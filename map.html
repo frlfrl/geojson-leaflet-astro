@@ -42,6 +42,33 @@
             width: 100% !important;
             margin: 0 !important;
         }
+        .smoke-opacity-wrapper {
+            z-index: 460;
+            position: absolute;
+            pointer-events: none;
+            opacity: 0.3;
+        }
+        .fire-opacity-wrapper {
+            z-index: 440;
+            position: absolute;
+            pointer-events: none;
+            opacity: 0.5;
+        }
+        .aqi-opacity-wrapper {
+            z-index: 450;
+            position: absolute;
+            pointer-events: none;
+            opacity: 0.3;
+        }
+        .overlay-legend {
+            padding: 0.5em;
+        }
+        .overlay-legend .circle {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            border-radius: 50%;
+        }
     </style>
     <div id="map"></div>
     <script>
@@ -86,16 +113,19 @@
             map.attributionControl.addAttribution(infoLink)
 
         // Order the smoke layers so density isn't obscured
-        map.createPane('smoke_1').style.zIndex = 450;
-        map.createPane('smoke_2').style.zIndex = 451;
-        map.createPane('smoke_3').style.zIndex = 452;
+        const smokeWrapper = document.createElement("div");
+        smokeWrapper.className = "fire-opacity-wrapper";
+        map.getContainer().querySelector('.leaflet-map-pane').appendChild(smokeWrapper);
+        map.createPane('smoke_1', smokeWrapper).style.zIndex = 460;
+        map.createPane('smoke_2', smokeWrapper).style.zIndex = 461;
+        map.createPane('smoke_3', smokeWrapper).style.zIndex = 462;
         const noaaSmoke = L.esri.featureLayer({
             url: "https://services2.arcgis.com/C8EMgrsFcRFL6LrL/arcgis/rest/services/NOAA_Satellite_Smoke_Detection_(v1)/FeatureServer/0", 
             style: (feature) => {
                 let style = {
                     color: '#626b73',
-                    opacity: 0.2,
-                    fillOpacity: smokeFillOpacity,
+                    opacity: 1,
+                    fillOpacity: 1,
                 };
                 if (feature.properties.Density === "Light") {
                     style.fillColor = "#6fee64";
@@ -111,10 +141,23 @@
                 return style;
             }
         })
-        map.createPane('fire_1').style.zIndex = 460;
-        map.createPane('fire_2').style.zIndex = 461;
-        map.createPane('fire_3').style.zIndex = 462;
-        map.createPane('fire_4').style.zIndex = 463;
+        var smokeLegend = L.control({position: 'bottomright'});
+        smokeLegend.onAdd = function (map) {
+            var div = L.DomUtil.create('div', 'overlay-legend leaflet-control-layers');
+            div.innerHTML = `<b>Smoke legend</b><br>
+            <div class="circle" style="background:#6fee64"></div> Light<br>
+            <div class="circle" style="background:#cdfb46"></div> Medium<br>
+            <div class="circle" style="background:#d97c25"></div> Heavy<br>`;
+            return div;
+        };
+        
+        const fireWrapper = document.createElement("div");
+        fireWrapper.className = "fire-opacity-wrapper";
+        map.getContainer().querySelector('.leaflet-map-pane').appendChild(fireWrapper);
+        map.createPane('fire_1', fireWrapper).style.zIndex = 440;
+        map.createPane('fire_2', fireWrapper).style.zIndex = 441;
+        map.createPane('fire_3', fireWrapper).style.zIndex = 442;
+        map.createPane('fire_4', fireWrapper).style.zIndex = 443;
         const noaaFire = L.esri.featureLayer({
             url: "https://services2.arcgis.com/C8EMgrsFcRFL6LrL/arcgis/rest/services/NOAA_Satellite_Fire_Detections_(v1)/FeatureServer/0",
               pointToLayer: function (geojson, latlng) {
@@ -127,8 +170,8 @@
             },
             style: (feature) => {
                 let style = {
-                    opacity: fireFillOpacity,
-                    fillOpacity: fireFillOpacity,
+                    opacity: 1,
+                    fillOpacity: 1,
                 };
                 if (feature.properties.FRP < 50) {
                     style.fillColor = "#feb14c";
@@ -147,20 +190,34 @@
                 return style;
             }
         })
-        map.createPane('aqi_1').style.zIndex = 460;
-        map.createPane('aqi_2').style.zIndex = 461;
-        map.createPane('aqi_3').style.zIndex = 462;
-        map.createPane('aqi_4').style.zIndex = 463;
-        map.createPane('aqi_5').style.zIndex = 464;
-        map.createPane('aqi_6').style.zIndex = 465;
-        const oneHourAgo = Math.floor(Date.now() / 1000) - 3600;
+        var fireLegend = L.control({position: 'bottomright'});
+        fireLegend.onAdd = function (map) {
+            var div = L.DomUtil.create('div', 'overlay-legend leaflet-control-layers');
+            div.innerHTML = `<b>Fire legend</b><br>
+            <div class="circle" style="background:#feb14c"></div> FRP < 50<br>
+            <div class="circle" style="background:#fc5029"></div> FRP < 150<br>
+            <div class="circle" style="background:#e3191c"></div> FRP < 350<br>
+            <div class="circle" style="background:#b30024"></div> FRP > 350<br>`;
+            return div;
+        };
+        
+        const aqiWrapper = document.createElement("div");
+        aqiWrapper.className = "aqi-opacity-wrapper";
+        map.getContainer().querySelector('.leaflet-map-pane').appendChild(aqiWrapper);
+        map.createPane('aqi_1', aqiWrapper).style.zIndex = 450;
+        map.createPane('aqi_2', aqiWrapper).style.zIndex = 451;
+        map.createPane('aqi_3', aqiWrapper).style.zIndex = 452;
+        map.createPane('aqi_4', aqiWrapper).style.zIndex = 453;
+        map.createPane('aqi_5', aqiWrapper).style.zIndex = 454;
+        map.createPane('aqi_6', aqiWrapper).style.zIndex = 455;
+        const sixHoursAgo = Math.floor(Date.now() / 1000) - 21600;
         const noaaAqi = L.esri.featureLayer({
             url: "https://services.arcgis.com/cJ9YHowT8TU7DUyn/ArcGIS/rest/services/AirNow24HrCombined/FeatureServer/0",
-            where: `Unixtime >= ${oneHourAgo}`,
+            where: `Unixtime >= ${sixHoursAgo}`,
             style: (feature) => {
                 let style = {
-                    opacity: 0.2,
-                    fillOpacity: aqiFillOpacity,
+                    opacity: 1,
+                    fillOpacity: 1
                 };
                 if (feature.properties.gridcode == 1) {
                     style.fillColor = "#00e400";
@@ -184,12 +241,26 @@
                 return style;
             }
         })
+        var aqiLegend = L.control({position: 'bottomright'});
+        aqiLegend.onAdd = function (map) {
+            var div = L.DomUtil.create('div', 'overlay-legend leaflet-control-layers');
+            div.innerHTML = `<b>AQI legend</b><br>
+            <div class="circle" style="background:#00e400"></div> Good<br>
+            <div class="circle" style="background:#ffff00"></div> Moderate<br>
+            <div class="circle" style="background:#ff8000"></div> Unhealthy for Sensitive Groups<br>
+            <div class="circle" style="background:#ff0000"></div> Unhealthy<br>
+            <div class="circle" style="background:#99004c"></div> Very Unhealthy<br>
+            <div class="circle" style="background:#4c0026"></div> Hazardous<br>`;
+            return div;
+        };
+
         const weather = L.tileLayer.wms('https://opengeo.ncep.noaa.gov/geoserver/conus/conus_cref_qcd/ows?SERVICE=WMS&', {
                     layers: 'conus_cref_qcd',
                     transparent: true,
                     opacity: 0.6,
                     format: 'image/png' // needed for transparency
                 })
+                
         const clouds = L.tileLayer.wms('https://mapservices.weather.noaa.gov/geoserver/ndfd/sky/ows?SERVICE=WMS&', {
                     layers: 'sky',
                     transparent: true,
@@ -197,32 +268,40 @@
                     format: 'image/png'
                 })
 
-        // Hacky way to let the opacity plugin work on esri featureLayers
-        const smokeFillOpacity = 0.3;
-        const fireFillOpacity = 0.5
-        const aqiFillOpacity = 0.3;
+        // Hacky way to let the opacity plugin work on esri featureLayers, targetting their parent
         noaaSmoke._url = 'feature';
         noaaFire._url = 'feature';
         noaaAqi._url = 'feature';
         noaaSmoke.setOpacity = function (opacity) {
-            this.setStyle({
-                fillOpacity: opacity,
-                opacity: opacity
-            });
+            smokeWrapper.style.opacity = opacity;
         };
         noaaFire.setOpacity = function (opacity) {
-            this.setStyle({
-                fillOpacity: opacity,
-                opacity: opacity
-            });
+            fireWrapper.style.opacity = opacity;
         };
         noaaAqi.setOpacity = function (opacity) {
-            this.setStyle({
-                fillOpacity: opacity,
-                opacity: opacity
-            });
+            aqiWrapper.style.opacity = opacity;
         };
 
+        // Add/remove overlay legends
+        map.on('overlayadd', function (e) {
+            if (e.name === 'Smoke') {
+                smokeLegend.addTo(map);
+            } else if (e.name === 'Fires') {
+                fireLegend.addTo(map);
+            } else if (e.name === 'AQI') {
+                aqiLegend.addTo(map);
+            }
+        });
+        map.on('overlayremove', function (e) {
+            if (e.name === 'Smoke') {
+                map.removeControl(smokeLegend);
+            } else if (e.name === 'Fires') {
+                map.removeControl(fireLegend);
+            }else if (e.name === 'AQI') {
+                map.removeControl(aqiLegend);
+            }
+        });
+        
         var overlays = {
             "Light": lightpollution2025,
             "Weather": weather,
