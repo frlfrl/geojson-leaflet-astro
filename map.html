@@ -46,13 +46,18 @@
     <div id="map"></div>
     <script>
         //TODO:
-        // - AQI: https://www.arcgis.com/home/item.html?id=ae6bb649e4dd4b18bac4e5b0c3ba2e8a#overview
-        // - Moar: https://www.weather.gov/gis/cloudgiswebservices
+        // - Moar? https://www.weather.gov/gis/cloudgiswebservices
+        // - Add color legends for enabled overlays
 
+        const map = L.map('map', {
+            center: [47.60, -122.34],
+            zoom: 8,
+        })
+        
         // Base maps
         var ofmLiberty = L.maplibreGL({
             style: 'https://tiles.openfreemap.org/styles/liberty',
-        })
+        }).addTo(map)
         var ofmFiord = L.maplibreGL({
             style: 'https://tiles.openfreemap.org/styles/fiord',
         })
@@ -77,23 +82,15 @@
                 zoomOffset: -2,
                 opacity: 0.4,
                 errorTileUrl: 'https://djlorenz.github.io/astronomy/image_tiles/tiles2025/black.png'
-            })
+            }).addTo(map)
+            map.attributionControl.addAttribution(infoLink)
 
+        // Order the smoke layers so density isn't obscured
+        map.createPane('smoke_1').style.zIndex = 450;
+        map.createPane('smoke_2').style.zIndex = 451;
+        map.createPane('smoke_3').style.zIndex = 452;
         const noaaSmoke = L.esri.featureLayer({
             url: "https://services2.arcgis.com/C8EMgrsFcRFL6LrL/arcgis/rest/services/NOAA_Satellite_Smoke_Detection_(v1)/FeatureServer/0", 
-            // Order the smoke layers so density isn't obscured
-            onEachFeature: function(feature, layer) {
-                if (feature.properties.Density === 'Heavy') {
-                    // setTimeout ensures the layer is fully rendered before moving it
-                    setTimeout(function() {
-                        layer.bringToFront(); 
-                    }, 0);
-                } else if (feature.properties.Density === 'Light') {
-                    setTimeout(function() {
-                        layer.bringToBack(); 
-                    }, 0);
-                }
-            },
             style: (feature) => {
                 let style = {
                     color: '#626b73',
@@ -102,16 +99,22 @@
                 };
                 if (feature.properties.Density === "Light") {
                     style.fillColor = "#6fee64";
+                    style.pane="smoke_1";
                 } else if (feature.properties.Density === "Medium") {
                     style.fillColor = "#cdfb46";
+                    style.pane="smoke_2";
                 } else if (feature.properties.Density === "Heavy") {
                     style.fillColor = "#d97c25";
+                    style.pane="smoke_3";
                 }
 
                 return style;
             }
         })
-
+        map.createPane('fire_1').style.zIndex = 460;
+        map.createPane('fire_2').style.zIndex = 461;
+        map.createPane('fire_3').style.zIndex = 462;
+        map.createPane('fire_4').style.zIndex = 463;
         const noaaFire = L.esri.featureLayer({
             url: "https://services2.arcgis.com/C8EMgrsFcRFL6LrL/arcgis/rest/services/NOAA_Satellite_Fire_Detections_(v1)/FeatureServer/0",
               pointToLayer: function (geojson, latlng) {
@@ -122,18 +125,6 @@
                     weight: 1,
                 });
             },
-            onEachFeature: function(feature, layer) {
-                if (feature.properties.FRP < 50) {
-                    // setTimeout ensures the layer is fully rendered before moving it
-                    setTimeout(function() {
-                        layer.bringToBack(); 
-                    }, 0);
-                } else if (feature.properties.FRP > 150) {
-                    setTimeout(function() {
-                        layer.bringToFront(); 
-                    }, 0);
-                }
-            },
             style: (feature) => {
                 let style = {
                     opacity: fireFillOpacity,
@@ -141,18 +132,58 @@
                 };
                 if (feature.properties.FRP < 50) {
                     style.fillColor = "#feb14c";
+                    style.pane = "fire_1";
                 } else if (feature.properties.FRP < 150) {
                     style.fillColor = "#fc5029";
+                    style.pane = "fire_2";
                 } else if (feature.properties.FRP < 350) {
                     style.fillColor = "#e3191c";
+                    style.pane = "fire_3";
                 } else {
                     style.fillColor = "#b30024";
+                    style.pane = "fire_4";
                 }
 
                 return style;
             }
         })
-
+        map.createPane('aqi_1').style.zIndex = 460;
+        map.createPane('aqi_2').style.zIndex = 461;
+        map.createPane('aqi_3').style.zIndex = 462;
+        map.createPane('aqi_4').style.zIndex = 463;
+        map.createPane('aqi_5').style.zIndex = 464;
+        map.createPane('aqi_6').style.zIndex = 465;
+        const oneHourAgo = Math.floor(Date.now() / 1000) - 3600;
+        const noaaAqi = L.esri.featureLayer({
+            url: "https://services.arcgis.com/cJ9YHowT8TU7DUyn/ArcGIS/rest/services/AirNow24HrCombined/FeatureServer/0",
+            where: `Unixtime >= ${oneHourAgo}`,
+            style: (feature) => {
+                let style = {
+                    opacity: 0.2,
+                    fillOpacity: aqiFillOpacity,
+                };
+                if (feature.properties.gridcode == 1) {
+                    style.fillColor = "#00e400";
+                    style.pane = "aqi_1";
+                } else if (feature.properties.gridcode == 2) {
+                    style.fillColor = "#ffff00";
+                    style.pane = "aqi_2";
+                } else if (feature.properties.gridcode == 3) {
+                    style.fillColor = "#ff8000";
+                    style.pane = "aqi_3";
+                } else if (feature.properties.gridcode == 4) {
+                    style.fillColor = "#ff0000";
+                    style.pane = "aqi_4";
+                } else if (feature.properties.gridcode == 5) {
+                    style.fillColor = "#99004c";
+                    style.pane = "aqi_5";
+                } else if (feature.properties.gridcode == 6) {
+                    style.fillColor = "#4c0026";
+                    style.pane = "aqi_6";
+                }
+                return style;
+            }
+        })
         const weather = L.tileLayer.wms('https://opengeo.ncep.noaa.gov/geoserver/conus/conus_cref_qcd/ows?SERVICE=WMS&', {
                     layers: 'conus_cref_qcd',
                     transparent: true,
@@ -169,8 +200,10 @@
         // Hacky way to let the opacity plugin work on esri featureLayers
         const smokeFillOpacity = 0.3;
         const fireFillOpacity = 0.5
+        const aqiFillOpacity = 0.3;
         noaaSmoke._url = 'feature';
         noaaFire._url = 'feature';
+        noaaAqi._url = 'feature';
         noaaSmoke.setOpacity = function (opacity) {
             this.setStyle({
                 fillOpacity: opacity,
@@ -183,21 +216,21 @@
                 opacity: opacity
             });
         };
+        noaaAqi.setOpacity = function (opacity) {
+            this.setStyle({
+                fillOpacity: opacity,
+                opacity: opacity
+            });
+        };
 
         var overlays = {
-            "Light.2025": lightpollution2025,
+            "Light": lightpollution2025,
+            "Weather": weather,
+            "Clouds": clouds,
             "Smoke": noaaSmoke,
             "Fires": noaaFire,
-            "Weather": weather,
-            "Clouds": clouds
+            "AQI": noaaAqi
         }
-
-        const map = L.map('map', {
-            center: [47.60, -122.34],
-            zoom: 8,
-            layers: [ofmLiberty, lightpollution2025],
-        })
-        map.attributionControl.addAttribution(infoLink)
 
         // Layer toggles
         var layerControl = L.control.layers(baseMaps, overlays, {
